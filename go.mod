@@ -1,9 +1,8 @@
 module discord-go-connect
 
-go 1.21.1
+go 1.20
 
 require (
-	github.com/ABrozovic/recws v0.0.0-20230926002722-715217ec36d3 // indirect
 	github.com/bwmarrin/discordgo v0.27.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
