@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/ABrozovic/recws"
+	"github.com/recws-org/recws"
 	"github.com/bwmarrin/discordgo"
 	"github.com/gorilla/websocket"
 )
