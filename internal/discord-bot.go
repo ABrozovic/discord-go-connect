@@ -2,11 +2,12 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 
-	"github.com/recws-org/recws"
 	"github.com/bwmarrin/discordgo"
 	"github.com/gorilla/websocket"
+	"github.com/recws-org/recws"
 )
 
 type Bot struct {
@@ -75,8 +76,8 @@ func subscribeToWebSocket(b *Bot) {
 	ws := recws.RecConn{
 		KeepAliveTimeout: 0,
 	}
-
-	ws.Dial("ws://127.0.0.1:8080/ws?type=SERVER", nil)
+	
+	ws.Dial("ws://127.0.0.1/ws?type=SERVER", nil)
 
 	go handleWebSocketMessages(ws.Conn, b)
 
@@ -89,7 +90,7 @@ func handleWebSocketMessages(conn *websocket.Conn, b *Bot) {
 			log.Println("Error reading message from WebSocket:", err)
 			return
 		}
-
+		fmt.Println(string(message))
 		var wsResponse WsJsonResponse
 		err = json.Unmarshal(message, &wsResponse)
 		if err != nil {

@@ -15,7 +15,7 @@ func main() {
 	go func() {
 		http.HandleFunc("/ws", internal.WsEndpoint)
 		log.Println("Starting WebSocket server on localhost:8080")
-		err := http.ListenAndServe(":8080", nil)
+		err := http.ListenAndServe(":80", nil)
 		if err != nil {
 			log.Fatal("Failed to start WebSocket server:", err)
 		}

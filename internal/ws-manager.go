@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -27,12 +28,13 @@ type WebSocketConnection struct {
 type Action string
 
 const (
-	ActionJoin  Action = "join"
-	ActionLeave Action = "leave"
-	ActionError Action = "error"
+	ActionJoin      Action = "join"
+	ActionLeave     Action = "leave"
+	ActionError     Action = "error"
+	ActionBroadcast Action = "broadcast"
 )
 
-// WsJsonResponse defines the response sent back from WebSocket.
+// WsJsonResponse defines the response sent back from websocket
 type WsJsonResponse struct {
 	Sender      string `json:"sender"`
 	Action      Action `json:"action"`
@@ -47,13 +49,12 @@ type WsPayload struct {
 	Conn    WebSocketConnection `json:"-"`
 }
 
-// WsEndpoint upgrades connection to WebSocket.
+// WsEndpoint Upgrades connection to websocket.
 func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	sender := r.URL.Query().Get("type")
 	ws, err := upgradeConnection.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("WebSocket upgrade failed:", err)
-		return
+		log.Println(err)
 	}
 
 	log.Println("Client connected to endpoint")
@@ -64,8 +65,9 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	conn := WebSocketConnection{Conn: ws, isClient: sender == "CLIENT"}
 	clients.Store(&conn, conn.RemoteAddr().Network())
 
-	if err := ws.WriteJSON(response); err != nil {
-		log.Println("Error writing JSON response:", err)
+	err = ws.WriteJSON(response)
+	if err != nil {
+		log.Println(err)
 	}
 
 	go ListenForWs(&conn, sender)
@@ -75,7 +77,7 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 func ListenForWs(conn *WebSocketConnection, sender string) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("Error:", r)
+			log.Println("Error", fmt.Sprintf("%v", r))
 		}
 	}()
 
@@ -84,7 +86,7 @@ func ListenForWs(conn *WebSocketConnection, sender string) {
 	for {
 		err := conn.ReadJSON(&payload)
 		if err != nil {
-			log.Println("Error reading JSON:", err)
+
 		} else {
 			payload.Conn = *conn
 			wsChan <- payload
@@ -94,8 +96,9 @@ func ListenForWs(conn *WebSocketConnection, sender string) {
 
 // ListenToWsChannel listens to the WebSocket channel and handles incoming events.
 func ListenToWsChannel() {
-	for event := range wsChan {
-		var response WsJsonResponse
+	var response WsJsonResponse
+	for {
+		event := <-wsChan
 		if event.Conn.isClient {
 			response.Sender = "CLIENT"
 		} else {
@@ -109,24 +112,22 @@ func ListenToWsChannel() {
 		case "CLIENT":
 			SendJSONToServer(&response)
 		case "SERVER":
-			BroadcastJSONToClients(&response)
+			BroadcastJsonToClients(&response)
 		}
 	}
 }
 
-// BroadcastJSONToClients sends a JSON response to all clients in the clients map.
-func BroadcastJSONToClients(response *WsJsonResponse) {
+// BroadcastJsonToClients sends a JSON response to all clients in the clients map.
+func BroadcastJsonToClients(response *WsJsonResponse) {
 	clients.Range(func(key, value interface{}) bool {
-		conn, ok := key.(WebSocketConnection)
-		if !ok {
-			return true
-		}
+		conn := key.(*WebSocketConnection)
 
 		if conn.isClient {
-			if err := conn.WriteJSON(*response); err != nil {
-				log.Println("WebSocket error:", err)
+			err := conn.WriteJSON(*response)
+			if err != nil {
+				log.Println("websocket err:", err)
 				conn.Close()
-				clients.Delete(key)
+				clients.Delete(conn)
 			}
 		}
 		return true
@@ -136,15 +137,14 @@ func BroadcastJSONToClients(response *WsJsonResponse) {
 // SendJSONToServer sends a JSON response to all non-client connections in the clients map.
 func SendJSONToServer(response *WsJsonResponse) {
 	clients.Range(func(key, value interface{}) bool {
-		conn, ok := key.(WebSocketConnection)
-		if !ok || conn.isClient {
-			return true
-		}
-
-		if err := conn.WriteJSON(*response); err != nil {
-			log.Println("WebSocket error:", err)
-			conn.Close()
-			clients.Delete(key)
+		conn := key.(*WebSocketConnection)
+		if !conn.isClient {
+			err := conn.WriteJSON(*response)
+			if err != nil {
+				log.Println("websocket err:", err)
+				conn.Close()
+				clients.Delete(conn)
+			}
 		}
 		return true
 	})
