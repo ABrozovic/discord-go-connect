@@ -2,6 +2,7 @@ package main
 
 import (
 	"discord-go-connect/internal"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 func main() {
 	go func() {
+		http.HandleFunc("/health", healthHandler)
 		http.HandleFunc("/ws", internal.WsEndpoint)
 		log.Println("Starting WebSocket server on localhost:8080")
 		err := http.ListenAndServe(":80", nil)
@@ -49,4 +51,20 @@ func main() {
 		log.Println("Failed to stop the bot:", err)
 	}
 
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	healthResponse := struct {
+		Status string `json:"status"`
+	}{
+		Status: "healthy",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err := json.NewEncoder(w).Encode(healthResponse)
+
+	if err != nil {
+		log.Printf("Health check encoding error: %v", err)
+	}
 }
