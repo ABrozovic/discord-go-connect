@@ -1,4 +1,4 @@
-package internal
+package ws
 
 import (
 	"fmt"
@@ -24,22 +24,12 @@ type WebSocketConnection struct {
 	isClient bool
 }
 
-// Action defines the action types for WebSocket communication.
-type Action string
-
-const (
-	ActionJoin      Action = "join"
-	ActionLeave     Action = "leave"
-	ActionError     Action = "error"
-	ActionBroadcast Action = "broadcast"
-)
-
 // WsJsonResponse defines the response sent back from websocket
 type WsJsonResponse struct {
 	Sender      string `json:"sender"`
 	Action      Action `json:"action"`
-	Message     string `json:"message"`
-	MessageType string `json:"message_type"`
+	MessageID   string `json:"message_id"`
+	Message     string `json:"message"`		
 }
 
 // WsPayload represents the payload sent over WebSocket.

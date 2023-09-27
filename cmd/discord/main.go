@@ -1,7 +1,8 @@
 package main
 
 import (
-	"discord-go-connect/internal"
+	bot "discord-go-connect/internal/discord"
+	ws "discord-go-connect/internal/websocket"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 func main() {
 	go func() {
 		http.HandleFunc("/health", healthHandler)
-		http.HandleFunc("/ws", internal.WsEndpoint)
+		http.HandleFunc("/ws", ws.WsEndpoint)
 		log.Println("Starting WebSocket server on localhost:8080")
 		err := http.ListenAndServe(":80", nil)
 		if err != nil {
@@ -24,7 +25,7 @@ func main() {
 	}()
 
 	log.Println("Starting channel listener")
-	go internal.ListenToWsChannel()
+	go ws.ListenToWsChannel()
 
 	err := godotenv.Load()
 	if err != nil {
@@ -32,7 +33,7 @@ func main() {
 	}
 	botToken := os.Getenv("DISCORD_BOT_TOKEN")
 
-	bot := internal.NewBot(botToken)
+	bot := bot.NewBot(botToken)
 
 	err = bot.Start()
 	if err != nil {

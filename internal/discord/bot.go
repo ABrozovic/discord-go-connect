@@ -1,6 +1,7 @@
-package internal
+package discord
 
 import (
+	ws "discord-go-connect/internal/websocket"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,6 +16,7 @@ type Bot struct {
 	token   string
 	guilds  map[string]*discordgo.Guild
 	dms     map[string]*discordgo.Channel
+	conn    *websocket.Conn
 }
 
 func NewBot(token string) *Bot {
@@ -76,22 +78,24 @@ func subscribeToWebSocket(b *Bot) {
 	ws := recws.RecConn{
 		KeepAliveTimeout: 0,
 	}
-	
+
 	ws.Dial("ws://127.0.0.1/ws?type=SERVER", nil)
 
-	go handleWebSocketMessages(ws.Conn, b)
+	b.conn = ws.Conn
+
+	go handleWebSocketMessages(b)
 
 }
 
-func handleWebSocketMessages(conn *websocket.Conn, b *Bot) {
+func handleWebSocketMessages(b *Bot) {
 	for {
-		_, message, err := conn.ReadMessage()
+		_, message, err := b.conn.ReadMessage()
 		if err != nil {
 			log.Println("Error reading message from WebSocket:", err)
 			return
 		}
 		fmt.Println(string(message))
-		var wsResponse WsJsonResponse
+		var wsResponse ws.WsJsonResponse
 		err = json.Unmarshal(message, &wsResponse)
 		if err != nil {
 			log.Println("Error decoding JSON message:", err)
@@ -99,37 +103,32 @@ func handleWebSocketMessages(conn *websocket.Conn, b *Bot) {
 		}
 
 		switch wsResponse.Action {
-		case ActionJoin:
-			// Send Bot.dms with Action "UPSERT_DMS"
-			dmsJSON, err := json.Marshal(map[string]interface{}{
-				"action": "UPSERT_DMS",
-				"dms":    b.dms,
-			})
-			if err != nil {
-				log.Println("Error marshaling JSON for UPSERT_DMS:", err)
-				continue
-			}
-			err = conn.WriteMessage(websocket.TextMessage, dmsJSON)
-			if err != nil {
-				log.Println("Error sending UPSERT_DMS:", err)
-				continue
-			}
-
-			// Send Bot.guilds with Action "UPSERT_GUILDS"
-			guildsJSON, err := json.Marshal(map[string]interface{}{
-				"action": "UPSERT_GUILDS",
-				"guilds": b.guilds,
-			})
-			if err != nil {
-				log.Println("Error marshaling JSON for UPSERT_GUILDS:", err)
-				continue
-			}
-			err = conn.WriteMessage(websocket.TextMessage, guildsJSON)
-			if err != nil {
-				log.Println("Error sending UPSERT_GUILDS:", err)
-				continue
-			}
+		case ws.ActionClientJoin:
+			b.sendJsonReponse(b.dms, ws.ActionServerListDms)
+			b.sendJsonReponse(b.guilds, ws.ActionServerListGuilds)
 		}
 
+	}
+}
+
+func (b *Bot) sendJsonReponse(toMarshal interface{}, action ws.Action) {
+	dmsJSON, err := json.Marshal(toMarshal)
+	if err != nil {
+		log.Printf("Error marshaling for %s. Error: %v:", action, err)
+		return
+	}
+
+	response, err := json.Marshal(ws.WsJsonResponse{
+		Action:    action,
+		Message:   string(dmsJSON),
+		MessageID: "0",
+	})
+	if err != nil {
+		log.Printf("Error marshaling %s. Error: %v", action, err)
+
+	}
+	err = b.conn.WriteMessage(websocket.TextMessage, response)
+	if err != nil {
+		log.Printf("Error sending %s. Error: %v", action, err)
 	}
 }
