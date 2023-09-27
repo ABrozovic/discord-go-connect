@@ -26,17 +26,18 @@ type WebSocketConnection struct {
 
 // WsJsonResponse defines the response sent back from websocket
 type WsJsonResponse struct {
-	Sender      string `json:"sender"`
-	Action      Action `json:"action"`
-	MessageID   string `json:"message_id"`
-	Message     string `json:"message"`		
+	Sender    string `json:"sender"`
+	Action    Action `json:"action"`
+	MessageID string `json:"message_id"`
+	Message   string `json:"message"`
 }
 
 // WsPayload represents the payload sent over WebSocket.
 type WsPayload struct {
-	Action  string              `json:"action"`
-	Message string              `json:"message"`
-	Conn    WebSocketConnection `json:"-"`
+	Action    string              `json:"action"`
+	MessageID string              `json:"message_id"`
+	Message   string              `json:"message"`
+	Conn      WebSocketConnection `json:"-"`
 }
 
 // WsEndpoint Upgrades connection to websocket.
@@ -97,6 +98,7 @@ func ListenToWsChannel() {
 
 		response.Action = Action(event.Action)
 		response.Message = event.Message
+		response.MessageID = event.MessageID
 
 		switch response.Sender {
 		case "CLIENT":
