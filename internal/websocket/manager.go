@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -51,7 +52,18 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	log.Println("Client connected to endpoint")
 
 	var response WsJsonResponse
-	response.Message = "Connected to server"
+
+	response.Sender = "SERVER"
+	response.MessageID = "0"
+	response.Action = ActionServerHandshake
+	status := struct {
+		Status int `json:"status"`
+	}{Status: 200}
+	statusMSG, err := json.Marshal(status)
+	if err != nil {
+		log.Printf("Error marshaling for %d. Error: %v:", status, err)
+	}
+	response.Message = string(statusMSG)
 
 	conn := WebSocketConnection{Conn: ws, isClient: sender == "CLIENT"}
 	clients.Store(&conn, conn.RemoteAddr().Network())
