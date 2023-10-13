@@ -1,42 +1,55 @@
 package main
 
 import (
-	bot "discord-go-connect/internal/discord"
-	ws "discord-go-connect/internal/websocket"
-	"encoding/json"
-	"log"
-	"net/http"
+	"discord-go-connect/internal/discord"
+	"discord-go-connect/internal/wshub"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"encoding/json"
+	"log"
+	"net/http"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
+	hub := wshub.NewHub()
+
 	go func() {
 		http.HandleFunc("/health", healthHandler)
-		http.HandleFunc("/ws", ws.WsEndpoint)
+		http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			wshub.WSHandler(hub, w, r)
+		})
+
 		log.Println("Starting WebSocket server on localhost:8080")
-		err := http.ListenAndServe(":80", nil)
+
+		server := &http.Server{
+			Addr:              ":80",
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+
+		err := server.ListenAndServe()
 		if err != nil {
 			log.Fatal("Failed to start WebSocket server:", err)
 		}
 	}()
 
 	log.Println("Starting channel listener")
-	go ws.ListenToWsChannel()
+
+	go hub.ListenToWSChannel()
 
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalln("DISCORD_BOT_TOKEN missing")
 	}
+
 	botToken := os.Getenv("DISCORD_BOT_TOKEN")
+	bot := discord.NewBot(botToken)
 
-	bot := bot.NewBot(botToken)
-
-	err = bot.Start()
-	if err != nil {
+	if err = bot.Start(); err != nil {
 		log.Fatal("Failed to start the bot:", err)
 		return
 	}
@@ -51,10 +64,9 @@ func main() {
 	if err != nil {
 		log.Println("Failed to stop the bot:", err)
 	}
-
 }
 
-func healthHandler(w http.ResponseWriter, r *http.Request) {
+func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	healthResponse := struct {
 		Status string `json:"status"`
 	}{
