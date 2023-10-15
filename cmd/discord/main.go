@@ -1,6 +1,7 @@
 package main
 
 import (
+	"discord-go-connect/internal/db"
 	"discord-go-connect/internal/discord"
 	"discord-go-connect/internal/wshub"
 	"os"
@@ -17,6 +18,14 @@ import (
 
 func main() {
 	hub := wshub.NewHub()
+	db, err := db.NewDBManager()
+
+	if err != nil {
+		log.Fatal("Error connecting to the database:", err)
+		return
+	}
+
+	defer db.Close()
 
 	go func() {
 		http.HandleFunc("/health", healthHandler)
@@ -41,13 +50,13 @@ func main() {
 
 	go hub.ListenToWSChannel()
 
-	err := godotenv.Load()
+	err = godotenv.Load()
 	if err != nil {
 		log.Fatalln("DISCORD_BOT_TOKEN missing")
 	}
 
 	botToken := os.Getenv("DISCORD_BOT_TOKEN")
-	bot := discord.NewBot(botToken)
+	bot := discord.NewBot(botToken, db)
 
 	if err = bot.Start(); err != nil {
 		log.Fatal("Failed to start the bot:", err)

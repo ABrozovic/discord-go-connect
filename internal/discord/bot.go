@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"discord-go-connect/internal/db"
 	"discord-go-connect/internal/logger"
 	"discord-go-connect/internal/wshub"
 	"encoding/json"
@@ -12,25 +13,36 @@ import (
 )
 
 type Bot struct {
-	session     *discordgo.Session
-	conn        *websocket.Conn
-	logger      *logger.StandardLoggerHandler
-	guilds      map[string]*discordgo.Guild
-	dms         map[string]*discordgo.Channel
-	subscribers map[string]string
-	onClose     chan struct{}
-	token       string
+	db             *db.DBManager
+	session        *discordgo.Session
+	conn           *websocket.Conn
+	logger         *logger.StandardLoggerHandler
+	writer         *messageWriter
+	writeInterval  time.Duration
+	guilds         map[string]*discordgo.Guild
+	dms            map[string]*discordgo.Channel
+	subscribers    map[string]string
+	onClose        chan struct{}
+	token          string
+	maxBufferCount int
 }
 
-func NewBot(token string) *Bot {
-	return &Bot{
-		token:       token,
-		guilds:      make(map[string]*discordgo.Guild),
-		dms:         make(map[string]*discordgo.Channel),
-		subscribers: make(map[string]string),
-		logger:      logger.NewLogger(os.Stderr),
-		onClose:     make(chan struct{}),
+func NewBot(token string, db *db.DBManager) *Bot {
+	b := &Bot{
+		db:            db,
+		token:         token,
+		guilds:        make(map[string]*discordgo.Guild),
+		dms:           make(map[string]*discordgo.Channel),
+		subscribers:   make(map[string]string),
+		logger:        logger.NewLogger(os.Stderr),
+		onClose:       make(chan struct{}),
+		writeInterval: 300 * time.Second,
+		maxBufferCount: 100,
 	}
+	writer := newMessageWriter(b)
+	b.writer = writer
+	writer.start()
+	return b
 }
 
 func (b *Bot) Start() error {
@@ -77,6 +89,9 @@ func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 			b.guilds[guild.ID] = guildData
 			b.guilds[guild.ID].Channels = channels
 		}
+		if err := b.CreateOrUpdateGuildsAndChannels(); err != nil {
+			b.logger.Error("%v", err)
+		}
 	}
 
 	if len(event.PrivateChannels) > 1 {
@@ -89,6 +104,7 @@ func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 }
 
 func (b *Bot) onMessage(_ *discordgo.Session, msg *discordgo.MessageCreate) {
+	b.writer.AddMessage(msg)
 	for receiver, guildID := range b.subscribers {
 		if guildID == msg.GuildID {
 			b.sendJSONReponse(msg, &wshub.WSPayload{Action: "channel_message", MessageID: msg.ChannelID, Receiver: receiver})
