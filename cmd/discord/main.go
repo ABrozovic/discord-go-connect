@@ -111,7 +111,8 @@ func main() {
 						http.Error(w, "Failed to fetch channels", http.StatusInternalServerError)
 						return
 					}
-					message.Timestamp, _ = time.Parse(time.RFC3339, timestamp)
+					layout := "2006-01-02 15:04:05.000"
+					message.Timestamp, _ = time.Parse(layout, timestamp)
 					if editedTimestamp.Valid {
 						message.EditedTimestamp = &editedTimestamp.Time
 					} else {
