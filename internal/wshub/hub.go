@@ -12,9 +12,9 @@ import (
 type Hub struct {
 	clients      map[*Client]struct{}
 	discordBot   *Client
-	broadcast    chan *WSPayload
-	unicast      chan *WSPayload
-	server       chan *WSPayload
+	broadcast    chan WSPayload
+	unicast      chan WSPayload
+	server       chan WSPayload
 	register     chan *Client
 	unregister   chan *Client
 	logger       *logger.StandardLoggerHandler
@@ -23,12 +23,12 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan *WSPayload),
-		unicast:    make(chan *WSPayload),
+		broadcast:  make(chan WSPayload),
+		unicast:    make(chan WSPayload),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		clients:    make(map[*Client]struct{}),
-		server:     make(chan *WSPayload),
+		server:     make(chan WSPayload, 10),
 		logger:     logger.NewLogger(os.Stderr),
 	}
 }
@@ -98,14 +98,14 @@ func (h *Hub) unregisterClient(client *Client) {
 	}
 }
 
-func (h *Hub) broadcastMessage(payload *WSPayload) {
+func (h *Hub) broadcastMessage(payload WSPayload) {
 	for client := range h.clients {
 		message := WSJSONResponse{Action: Action[ClientAction](payload.Action), MessageID: payload.MessageID, Message: payload.Message}
 		client.SendMessage(&message)
 	}
 }
 
-func (h *Hub) unicastMessage(payload *WSPayload) {
+func (h *Hub) unicastMessage(payload WSPayload) {
 	if client, ok := h.clientLookup.Load(payload.Receiver); ok {
 		message := WSJSONResponse{Action: Action[ClientAction](payload.Action), MessageID: payload.MessageID, Message: payload.Message}
 
@@ -115,7 +115,7 @@ func (h *Hub) unicastMessage(payload *WSPayload) {
 	}
 }
 
-func (h *Hub) sendPayloadToBot(payload *WSPayload) {
+func (h *Hub) sendPayloadToBot(payload WSPayload) {
 	if h.discordBot == nil {
 		return
 	}

@@ -10,7 +10,7 @@ import (
 type messageWriter struct {
 	b            *Bot
 	writeMu      sync.Mutex
-	writeBuffer  []*discordgo.MessageCreate
+	WriteBuffer  []*discordgo.MessageCreate
 	writeTimer   *time.Timer
 	writeCounter int
 }
@@ -18,7 +18,7 @@ type messageWriter struct {
 func newMessageWriter(b *Bot) *messageWriter {
 	return &messageWriter{
 		b:            b,
-		writeBuffer:  make([]*discordgo.MessageCreate, 0),
+		WriteBuffer:  make([]*discordgo.MessageCreate, 0),
 		writeTimer:   time.NewTimer(b.writeInterval),
 		writeCounter: 0,
 	}
@@ -32,10 +32,10 @@ func (mw *messageWriter) AddMessage(msg *discordgo.MessageCreate) {
 	mw.writeMu.Lock()
 	defer mw.writeMu.Unlock()
 
-	mw.writeBuffer = append(mw.writeBuffer, msg)
+	mw.WriteBuffer = append(mw.WriteBuffer, msg)
 	mw.writeCounter++
 
-	if len(mw.writeBuffer) >= mw.b.maxBufferCount || mw.writeCounter >= mw.b.maxBufferCount {
+	if len(mw.WriteBuffer) >= mw.b.maxBufferCount || mw.writeCounter >= mw.b.maxBufferCount {
 		mw.writeToDatabase()
 		return
 	}
@@ -53,15 +53,15 @@ func (mw *messageWriter) writeToDatabase() {
 	mw.writeMu.Lock()
 	defer mw.writeMu.Unlock()
 
-	if len(mw.writeBuffer) == 0 {
+	if len(mw.WriteBuffer) == 0 {
 		return
 	}
 
-	err := mw.b.CreateMessage(mw.writeBuffer)
+	err := mw.b.CreateMessage(mw.WriteBuffer)
 	if err != nil {
 		mw.b.logger.Error("failed to write messages to the database: %v", err)
 	}
 
-	mw.writeBuffer = make([]*discordgo.MessageCreate, 0)
+	mw.WriteBuffer = make([]*discordgo.MessageCreate, 0)
 	mw.writeCounter = 0
 }

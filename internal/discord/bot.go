@@ -5,6 +5,7 @@ import (
 	"discord-go-connect/internal/logger"
 	"discord-go-connect/internal/wshub"
 	"encoding/json"
+	"log"
 	"os"
 	"time"
 
@@ -29,14 +30,14 @@ type Bot struct {
 
 func NewBot(token string, db *db.DBManager) *Bot {
 	b := &Bot{
-		db:            db,
-		token:         token,
-		guilds:        make(map[string]*discordgo.Guild),
-		dms:           make(map[string]*discordgo.Channel),
-		subscribers:   make(map[string]string),
-		logger:        logger.NewLogger(os.Stderr),
-		onClose:       make(chan struct{}),
-		writeInterval: 300 * time.Second,
+		db:             db,
+		token:          token,
+		guilds:         make(map[string]*discordgo.Guild),
+		dms:            make(map[string]*discordgo.Channel),
+		subscribers:    make(map[string]string),
+		logger:         logger.NewLogger(os.Stderr),
+		onClose:        make(chan struct{}),
+		writeInterval:  300 * time.Second,
 		maxBufferCount: 100,
 	}
 	writer := newMessageWriter(b)
@@ -89,9 +90,12 @@ func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 			b.guilds[guild.ID] = guildData
 			b.guilds[guild.ID].Channels = channels
 		}
-		if err := b.CreateOrUpdateGuildsAndChannels(); err != nil {
-			b.logger.Error("%v", err)
-		}
+		go func() {
+			if err := b.CreateOrUpdateGuildsAndChannels(); err != nil {
+				b.logger.Error("%v", err)
+			}
+		}()
+
 	}
 
 	if len(event.PrivateChannels) > 1 {
@@ -104,10 +108,15 @@ func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 }
 
 func (b *Bot) onMessage(_ *discordgo.Session, msg *discordgo.MessageCreate) {
+	if len(msg.Content) == 0 {
+		return
+	}
+
 	b.writer.AddMessage(msg)
 	for receiver, guildID := range b.subscribers {
+		b.logger.Debug("listening to guild %s, and with user id %s", msg.GuildID, receiver)
 		if guildID == msg.GuildID {
-			b.sendJSONReponse(msg, &wshub.WSPayload{Action: "channel_message", MessageID: msg.ChannelID, Receiver: receiver})
+			b.sendJSONReponse(msg, &wshub.WSPayload{Action: "messages", MessageID: msg.ChannelID, Receiver: receiver})
 		}
 	}
 }
@@ -198,17 +207,25 @@ func (b *Bot) handleWebSocketMessages() {
 			continue
 		}
 
-		b.logger.Info("%v", wsPayload)
+		b.logger.Info("bot received %v", wsPayload)
 
 		action := wshub.Action[wshub.ClientAction](wsPayload.Action)
 
 		switch action {
 		case wshub.ClientJoin:
-			b.sendJSONReponse(b.dms, &wshub.WSPayload{Action: wshub.ServerListDms})
+			// b.sendJSONReponse(b.dms, &wshub.WSPayload{Action: wshub.ServerListDms})
 			b.sendJSONReponse(b.guilds, &wshub.WSPayload{Action: wshub.ServerListGuilds})
 		case wshub.ClientGuildMessage:
 			b.sendMessageToChannel(wsPayload.MessageID, wsPayload.Message)
 		case wshub.ClientSubscribeToGuild:
+			b.logger.Debug("%d, message %v", len(b.writer.WriteBuffer), wsPayload)
+			msgs := make([]*discordgo.MessageCreate, 0)
+			for _, msg := range b.writer.WriteBuffer {
+				if msg.GuildID == wsPayload.Message {
+					msgs = append(msgs, msg)
+				}
+			}
+			b.sendJSONReponse(msgs, &wshub.WSPayload{Action: "messages", Receiver: wsPayload.Receiver})
 			b.subscribers[wsPayload.Receiver] = wsPayload.Message
 		case wshub.ClientLeave:
 			delete(b.subscribers, wsPayload.Message)
@@ -219,6 +236,7 @@ func (b *Bot) handleWebSocketMessages() {
 }
 
 func (b *Bot) sendJSONReponse(toMarshal interface{}, wsReponse *wshub.WSPayload) {
+	log.Println("Payload", wsReponse.Action)
 	message, err := json.Marshal(toMarshal)
 	if err != nil {
 		b.logger.Error("eror marshaling for %s. Error: %v:", wsReponse.Action, err)

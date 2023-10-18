@@ -69,7 +69,7 @@ func (c *Client) ReadWS() {
 			c.logger.Debug("Error %v", err)
 		}
 
-		c.hub.server <- &WSPayload{Action: Action[ServerAction](ClientLeave), Message: c.ID}
+		c.hub.server <- WSPayload{Action: Action[ServerAction](ClientLeave), Message: c.ID}
 		c.hub.unregister <- c
 	}()
 
@@ -107,12 +107,12 @@ func (c *Client) ReadWS() {
 
 		if _, ok := c.hub.clients[c]; ok && c.hub.discordBot != nil {
 			payload.Receiver = c.ID
-			c.hub.server <- &payload
+			c.hub.server <- payload
 		} else {
 			if len(payload.Receiver) > 0 {
-				c.hub.unicast <- &payload
+				c.hub.unicast <- payload
 			} else {
-				c.hub.broadcast <- &payload
+				c.hub.broadcast <- payload
 			}
 		}
 	}

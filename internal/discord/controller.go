@@ -34,13 +34,9 @@ const (
 			VALUES (?, ?, ?, ?, ?)
 		`
 	insertMessage = `
-			INSERT INTO Message (id, channel_id, guild_id, author_id, member_id, pinned, type, content)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO Message (id, channel_id, guild_id, author_id, member_id, pinned, type, content, timestamp, edited_timestamp)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`
-	// insertMessage = `
-	// 	INSERT INTO Message (id, channel_id, guild_id, pinned, type, attachments, embeds, mentions, author_id)
-	// 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	// `
 )
 
 func (b *Bot) CreateOrUpdateGuilds() error {
@@ -115,6 +111,7 @@ func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
 }
 
 func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
+
 	tx, err := b.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start database transaction: %w", err)
@@ -157,10 +154,10 @@ func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
 		}
 
 		_, err = stmtMessage.Exec(
-			message.ID, message.ChannelID, message.GuildID, message.Author.ID, 
+			message.ID, message.ChannelID, message.GuildID, message.Author.ID,
 			message.Author.ID, message.Pinned, message.Type,
 			//TODO: message.Attachments, message.Embeds, message.Mentions,
-			message.Content,
+			message.Content, message.Timestamp, message.EditedTimestamp,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to execute SQL statement for messages: %w", err)

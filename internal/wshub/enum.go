@@ -9,12 +9,12 @@ type Action[T ServerAction | ClientAction] string
 
 const (
 	ClientHearbeat         Action[ClientAction] = "heartbeat"
-	ClientJoin             Action[ClientAction] = "join"
+	ClientJoin             Action[ClientAction] = "get_guilds"
 	ClientLeave            Action[ClientAction] = "leave"
 	ClientGuildMessage     Action[ClientAction] = "guild_message"
-	ClientSubscribeToGuild Action[ClientAction] = "subscribe_to_guild"
+	ClientSubscribeToGuild Action[ClientAction] = "get_messages"
 	ClientDmMessage        Action[ClientAction] = "dm_message"
 	ServerHandshake        Action[ServerAction] = "handshake"
-	ServerListGuilds       Action[ServerAction] = "list_guilds"
+	ServerListGuilds       Action[ServerAction] = "guilds"
 	ServerListDms          Action[ServerAction] = "list_dms"
 )
