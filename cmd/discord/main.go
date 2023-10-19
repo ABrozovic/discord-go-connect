@@ -40,28 +40,28 @@ func main() {
 		http.HandleFunc("/api/channel", func(w http.ResponseWriter, r *http.Request) {
 
 			selectMessages := `
-	SELECT 
-		Message.id, 
-		Message.channel_id, 
-		Message.guild_id,
-		Message.author_id,
-		Message.pinned,
-		Message.type AS message_type,
-		Message.content,
-		Message.timestamp AS message_timestamp,
-		Message.edited_timestamp,
-		Author.username,
-		Author.avatar,
-		Author.bot,
-		Member.nick,
-		Member.avatar 
-	FROM Message
-	JOIN Author ON Message.author_id = Author.id
-	JOIN Member ON Message.member_id = Member.id
-	WHERE Message.channel_id = ?
-	ORDER BY Message.timestamp DESC
-	LIMIT ? OFFSET ?;
-`
+				SELECT 
+					Message.id, 
+					Message.channel_id, 
+					Message.guild_id,
+					Message.author_id,
+					Message.pinned,
+					Message.type AS message_type,
+					Message.content,
+					Message.timestamp AS message_timestamp,
+					Message.edited_timestamp,
+					Author.username,
+					Author.avatar,
+					Author.bot,
+					Member.nick,
+					Member.avatar 
+				FROM Message
+				JOIN Author ON Message.author_id = Author.id
+				JOIN Member ON Message.member_id = Member.id
+				WHERE Message.channel_id = ?
+				ORDER BY Message.timestamp DESC
+				LIMIT ? OFFSET ?;
+			`
 			w.Header().Set("Content-Type", "application/json")
 			if r.Method == "GET" {
 				channelID := r.URL.Query().Get("channelId")

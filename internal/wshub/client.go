@@ -18,7 +18,7 @@ type Client struct {
 }
 
 const (
-	pongWait        = 60 * time.Second
+	pongWait        = 120 * time.Second
 	readBufferSize  = 1024
 	writeBufferSize = 1024
 )

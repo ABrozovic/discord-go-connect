@@ -113,6 +113,7 @@ func (b *Bot) onMessage(_ *discordgo.Session, msg *discordgo.MessageCreate) {
 	}
 
 	b.writer.AddMessage(msg)
+
 	for receiver, guildID := range b.subscribers {
 		b.logger.Debug("listening to guild %s, and with user id %s", msg.GuildID, receiver)
 		if guildID == msg.GuildID {
