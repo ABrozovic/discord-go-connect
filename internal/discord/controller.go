@@ -137,6 +137,10 @@ func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
 	defer stmtMessage.Close()
 
 	for _, message := range messages {
+		if message == nil || message.Author == nil || message.Member == nil {			
+			continue
+		}
+
 		_, err := stmtAuthor.Exec(
 			message.Author.ID, message.Author.Email, message.Author.Username,
 			message.Author.Avatar, message.Author.Bot, message.Author.System,

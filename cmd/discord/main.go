@@ -69,6 +69,7 @@ func main() {
 				page := r.URL.Query().Get("page")
 				pageSize := 20
 				pageNum, err := strconv.Atoi(page)
+				
 				if err != nil {
 					http.Error(w, "Invalid page number", http.StatusBadRequest)
 					return
@@ -90,7 +91,7 @@ func main() {
 					message.Member = &discordgo.Member{}
 					var timestamp string
 					var editedTimestamp sql.NullTime
-					err := rows.Scan(
+					err = rows.Scan(
 						&message.ID,
 						&message.ChannelID,
 						&message.GuildID,
@@ -120,7 +121,7 @@ func main() {
 					}
 					messages = append(messages, message)
 				}
-				if err := rows.Err(); err != nil {
+				if err = rows.Err(); err != nil {
 					log.Println("Error iterating over channels rows:", err)
 					http.Error(w, "Failed to fetch channels", http.StatusInternalServerError)
 					return
@@ -164,7 +165,7 @@ func main() {
 			ReadHeaderTimeout: 3 * time.Second,
 		}
 
-		err := server.ListenAndServe()
+		err = server.ListenAndServe()
 		if err != nil {
 			log.Fatal("Failed to start WebSocket server:", err)
 		}

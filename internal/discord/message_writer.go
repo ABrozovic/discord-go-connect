@@ -44,6 +44,12 @@ func (mw *messageWriter) AddMessage(msg *discordgo.MessageCreate) {
 }
 
 func (mw *messageWriter) periodicWriteToDatabase() {
+	defer func () {
+		if r := recover(); r!=nil {
+			mw.b.logger.Debug("Recovered in %v", r)
+		}
+	}()
+	
 	for range mw.writeTimer.C {
 		mw.writeToDatabase()
 	}
