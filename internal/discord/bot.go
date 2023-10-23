@@ -5,7 +5,6 @@ import (
 	"discord-go-connect/internal/logger"
 	"discord-go-connect/internal/wshub"
 	"encoding/json"
-	"log"
 	"os"
 	"time"
 
@@ -14,7 +13,7 @@ import (
 )
 
 type Bot struct {
-	db             *db.DBManager
+	db             *db.Manager
 	session        *discordgo.Session
 	conn           *websocket.Conn
 	logger         *logger.StandardLoggerHandler
@@ -28,9 +27,9 @@ type Bot struct {
 	maxBufferCount int
 }
 
-func NewBot(token string, db *db.DBManager) *Bot {
+func NewBot(token string, dbManager *db.Manager) *Bot {
 	b := &Bot{
-		db:             db,
+		db:             dbManager,
 		token:          token,
 		guilds:         make(map[string]*discordgo.Guild),
 		dms:            make(map[string]*discordgo.Channel),
@@ -43,6 +42,7 @@ func NewBot(token string, db *db.DBManager) *Bot {
 	writer := newMessageWriter(b)
 	b.writer = writer
 	writer.start()
+
 	return b
 }
 
@@ -54,6 +54,8 @@ func (b *Bot) Start() error {
 
 	session.AddHandler(b.onReady)
 	session.AddHandler(b.onMessage)
+	session.AddHandler(b.onDisconnect)
+	
 
 	session.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsGuildVoiceStates
 
@@ -79,6 +81,14 @@ func (b *Bot) Stop() error {
 	return nil
 }
 
+func (b *Bot) onDisconnect(_ *discordgo.Session, event *discordgo.Disconnect) {
+	b.logger.Error("Lost connection to Discord. Reconnecting...")
+
+	// Attempt to reconnect by reopening the connection
+	if err := b.session.Open(); err != nil {
+		b.logger.Error("failed to reconnect: %v", err)
+	}
+}
 func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 	b.logger.Debug("Bot is ready!")
 
@@ -90,12 +100,12 @@ func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 			b.guilds[guild.ID] = guildData
 			b.guilds[guild.ID].Channels = channels
 		}
+
 		go func() {
 			if err := b.CreateOrUpdateGuildsAndChannels(); err != nil {
 				b.logger.Error("%v", err)
 			}
 		}()
-
 	}
 
 	if len(event.PrivateChannels) > 1 {
@@ -108,7 +118,7 @@ func (b *Bot) onReady(s *discordgo.Session, event *discordgo.Ready) {
 }
 
 func (b *Bot) onMessage(_ *discordgo.Session, msg *discordgo.MessageCreate) {
-	if len(msg.Content) == 0 {
+	if msg.Content == "" {
 		return
 	}
 
@@ -116,6 +126,7 @@ func (b *Bot) onMessage(_ *discordgo.Session, msg *discordgo.MessageCreate) {
 
 	for receiver, guildID := range b.subscribers {
 		b.logger.Debug("listening to guild %s, and with user id %s", msg.GuildID, receiver)
+
 		if guildID == msg.GuildID {
 			b.sendJSONReponse(msg, &wshub.WSPayload{Action: "messages", MessageID: msg.ChannelID, Receiver: receiver})
 		}
@@ -154,7 +165,7 @@ func (b *Bot) subscribeToWebSocket() {
 	for {
 		conn, _, err := websocket.DefaultDialer.Dial("ws://127.0.0.1/ws?type=D-BOT", nil)
 		if err != nil {
-			b.logger.Info("WebSocket connection error: %v", err)
+			b.logger.Info("Bot error - WebSocket connection error: %v", err)
 
 			reconnectInterval := time.Second * 5
 			time.Sleep(reconnectInterval)
@@ -195,7 +206,7 @@ func (b *Bot) handleWebSocketMessages() {
 		_, message, err := b.conn.ReadMessage()
 
 		if err != nil {
-			b.logger.Error("error reading message from WebSocket: %v", err)
+			b.logger.Error("bot error - reading message from WebSocket: %v", err)
 
 			b.conn.Close()
 			b.onClose <- struct{}{}
@@ -204,11 +215,9 @@ func (b *Bot) handleWebSocketMessages() {
 		}
 
 		if err = json.Unmarshal(message, &wsPayload); err != nil {
-			b.logger.Error("error decoding JSON message: %v", err)
+			b.logger.Error("bot error - decoding JSON message: %v", err)
 			continue
 		}
-
-		b.logger.Info("bot received %v", wsPayload)
 
 		action := wshub.Action[wshub.ClientAction](wsPayload.Action)
 
@@ -219,13 +228,14 @@ func (b *Bot) handleWebSocketMessages() {
 		case wshub.ClientGuildMessage:
 			b.sendMessageToChannel(wsPayload.MessageID, wsPayload.Message)
 		case wshub.ClientSubscribeToGuild:
-			b.logger.Debug("%d, message %v", len(b.writer.WriteBuffer), wsPayload)
 			msgs := make([]*discordgo.MessageCreate, 0)
+
 			for _, msg := range b.writer.WriteBuffer {
 				if msg.GuildID == wsPayload.Message {
 					msgs = append(msgs, msg)
 				}
 			}
+
 			b.sendJSONReponse(msgs, &wshub.WSPayload{Action: "messages", Receiver: wsPayload.Receiver})
 			b.subscribers[wsPayload.Receiver] = wsPayload.Message
 		case wshub.ClientLeave:
@@ -237,10 +247,9 @@ func (b *Bot) handleWebSocketMessages() {
 }
 
 func (b *Bot) sendJSONReponse(toMarshal interface{}, wsReponse *wshub.WSPayload) {
-	log.Println("Payload", wsReponse.Action)
 	message, err := json.Marshal(toMarshal)
 	if err != nil {
-		b.logger.Error("eror marshaling for %s. Error: %v:", wsReponse.Action, err)
+		b.logger.Error("error marshaling for %s. Error: %v:", wsReponse.Action, err)
 		return
 	}
 

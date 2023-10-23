@@ -78,7 +78,7 @@ func (b *Bot) CreateOrUpdateChannels() error {
 }
 
 func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
-
+	b.logger.Info("updating database")
 	guildStmt, err := b.db.Prepare(insertGuilds)
 	if err != nil {
 		return fmt.Errorf("failed to prepare Guild SQL statement: %w", err)
@@ -98,11 +98,9 @@ func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
 		}
 
 		for _, channel := range guild.Channels {
-
 			_, err := channelStmt.Exec(channel.ID, guild.ID, channel.Name, channel.NSFW, channel.Position)
 			if err != nil {
 				return fmt.Errorf("failed to execute Channel SQL statement: %w", err)
-
 			}
 		}
 	}
@@ -111,12 +109,16 @@ func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
 }
 
 func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
-
 	tx, err := b.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start database transaction: %w", err)
 	}
-	defer tx.Rollback()
+
+	defer func() {
+		if err = tx.Rollback(); err != nil {
+			b.logger.Error("%v", err)
+		}
+	}()
 
 	stmtAuthor, err := tx.Prepare(insertAuthor)
 	if err != nil {
@@ -137,7 +139,7 @@ func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
 	defer stmtMessage.Close()
 
 	for _, message := range messages {
-		if message == nil || message.Author == nil || message.Member == nil {			
+		if message == nil || message.Author == nil || message.Member == nil {
 			continue
 		}
 

@@ -10,8 +10,8 @@ import (
 type messageWriter struct {
 	b            *Bot
 	writeMu      sync.Mutex
-	WriteBuffer  []*discordgo.MessageCreate
 	writeTimer   *time.Timer
+	WriteBuffer  []*discordgo.MessageCreate
 	writeCounter int
 }
 
@@ -44,12 +44,12 @@ func (mw *messageWriter) AddMessage(msg *discordgo.MessageCreate) {
 }
 
 func (mw *messageWriter) periodicWriteToDatabase() {
-	defer func () {
-		if r := recover(); r!=nil {
+	defer func() {
+		if r := recover(); r != nil {
 			mw.b.logger.Debug("Recovered in %v", r)
 		}
 	}()
-	
+
 	for range mw.writeTimer.C {
 		mw.writeToDatabase()
 	}

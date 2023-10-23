@@ -5,11 +5,12 @@ import (
 	"log"
 	"os"
 
+	// mysql import
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 )
 
-type DBConfig struct {
+type Config struct {
 	Username string
 	Password string
 	Host     string
@@ -17,11 +18,11 @@ type DBConfig struct {
 	Database string
 }
 
-type DBManager struct {
+type Manager struct {
 	db *sql.DB
 }
 
-func NewDBManager() (*DBManager, error) {
+func NewDBManager() (*Manager, error) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("failed to load env", err)
@@ -40,24 +41,24 @@ func NewDBManager() (*DBManager, error) {
 		return nil, err
 	}
 
-	return &DBManager{
+	return &Manager{
 		db: db,
 	}, nil
 }
 
-func (m *DBManager) Close() error {
+func (m *Manager) Close() error {
 	return m.db.Close()
 }
 
-func (m *DBManager) Begin() (*sql.Tx, error) {
+func (m *Manager) Begin() (*sql.Tx, error) {
 	return m.db.Begin()
 }
 
-func (m *DBManager) Prepare(query string) (*sql.Stmt, error) {
+func (m *Manager) Prepare(query string) (*sql.Stmt, error) {
 	return m.db.Prepare(query)
 }
 
-func (m *DBManager) Execute(query string, args ...interface{}) (sql.Result, error) {
+func (m *Manager) Execute(query string, args ...interface{}) (sql.Result, error) {
 	stmt, err := m.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -72,7 +73,7 @@ func (m *DBManager) Execute(query string, args ...interface{}) (sql.Result, erro
 	return result, nil
 }
 
-func (m *DBManager) Query(query string, args ...interface{}) (*sql.Rows, error) {
+func (m *Manager) Query(query string, args ...interface{}) (*sql.Rows, error) {
 	rows, err := m.db.Query(query, args...)
 	if err != nil {
 		return nil, err

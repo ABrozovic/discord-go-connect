@@ -44,11 +44,11 @@ func (h *Hub) ListenToWSChannel() {
 			h.unregisterClient(client)
 
 		case payload := <-h.broadcast:
-			h.broadcastMessage(payload)
+			h.broadcastMessage(&payload)
 		case payload := <-h.unicast:
-			h.unicastMessage(payload)
+			h.unicastMessage(&payload)
 		case payload := <-h.server:
-			h.sendPayloadToBot(payload)
+			h.sendPayloadToBot(&payload)
 		}
 	}
 }
@@ -89,23 +89,20 @@ func (h *Hub) unregisterClient(client *Client) {
 		h.clientLookup.Delete(client.ID)
 		delete(h.clients, client)
 		client.Conn.Close()
-
-	} else {
-		if h.discordBot != nil {
-			client.Conn.Close()
-			h.logger.Debug("Unregistering %s with id: %s", client.ClientType, client.ID)
-		}
+	} else if h.discordBot != nil {
+		client.Conn.Close()
+		h.logger.Debug("Unregistering %s with id: %s", client.ClientType, client.ID)
 	}
 }
 
-func (h *Hub) broadcastMessage(payload WSPayload) {
+func (h *Hub) broadcastMessage(payload *WSPayload) {
 	for client := range h.clients {
 		message := WSJSONResponse{Action: Action[ClientAction](payload.Action), MessageID: payload.MessageID, Message: payload.Message}
 		client.SendMessage(&message)
 	}
 }
 
-func (h *Hub) unicastMessage(payload WSPayload) {
+func (h *Hub) unicastMessage(payload *WSPayload) {
 	if client, ok := h.clientLookup.Load(payload.Receiver); ok {
 		message := WSJSONResponse{Action: Action[ClientAction](payload.Action), MessageID: payload.MessageID, Message: payload.Message}
 
@@ -115,7 +112,7 @@ func (h *Hub) unicastMessage(payload WSPayload) {
 	}
 }
 
-func (h *Hub) sendPayloadToBot(payload WSPayload) {
+func (h *Hub) sendPayloadToBot(payload *WSPayload) {
 	if h.discordBot == nil {
 		return
 	}

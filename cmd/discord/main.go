@@ -22,14 +22,14 @@ import (
 
 func main() {
 	hub := wshub.NewHub()
-	db, err := db.NewDBManager()
+	dbManager, err := db.NewDBManager()
 
 	if err != nil {
 		log.Fatal("Error connecting to the database:", err)
 		return
 	}
 
-	defer db.Close()
+	defer dbManager.Close()
 
 	go func() {
 		http.HandleFunc("/health", healthHandler)
@@ -38,7 +38,6 @@ func main() {
 		})
 
 		http.HandleFunc("/api/channel", func(w http.ResponseWriter, r *http.Request) {
-
 			selectMessages := `
 				SELECT 
 					Message.id, 
@@ -69,14 +68,14 @@ func main() {
 				page := r.URL.Query().Get("page")
 				pageSize := 20
 				pageNum, err := strconv.Atoi(page)
-				
+
 				if err != nil {
 					http.Error(w, "Invalid page number", http.StatusBadRequest)
 					return
 				}
 
 				offset := (pageNum - 1) * pageSize
-				rows, err := db.Query(selectMessages, channelID, pageSize+1, offset)
+				rows, err := dbManager.Query(selectMessages, channelID, pageSize+1, offset)
 				if err != nil {
 					log.Println("Failed to fetch messages:", err)
 					http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
@@ -152,12 +151,14 @@ func main() {
 				}
 
 				w.Header().Set("Content-Type", "application/json")
-				w.Write(jsonBytes)
-
+				if _, err := w.Write(jsonBytes); err != nil {
+					log.Println("api endpoint error:", err)
+				}
 			}
 		})
 
 		log.Println("Starting WebSocket server on localhost:8080")
+
 		corsHandler := cors.Default().Handler(http.DefaultServeMux)
 		server := &http.Server{
 			Addr:              ":80",
@@ -177,14 +178,15 @@ func main() {
 
 	err = godotenv.Load()
 	if err != nil {
-		log.Fatalln("DISCORD_BOT_TOKEN missing")
+		log.Println("DISCORD_BOT_TOKEN missing")
+		return
 	}
 
 	botToken := os.Getenv("DISCORD_BOT_TOKEN")
-	bot := discord.NewBot(botToken, db)
+	bot := discord.NewBot(botToken, dbManager)
 
 	if err = bot.Start(); err != nil {
-		log.Fatal("Failed to start the bot:", err)
+		log.Println("Failed to start the bot:", err)
 		return
 	}
 
