@@ -77,8 +77,7 @@ func (b *Bot) CreateOrUpdateChannels() error {
 	return nil
 }
 
-func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
-	b.logger.Info("updating database")
+func (b *Bot) CreateOrUpdateGuildsAndChannels() error {	
 	guildStmt, err := b.db.Prepare(insertGuilds)
 	if err != nil {
 		return fmt.Errorf("failed to prepare Guild SQL statement: %w", err)
@@ -109,6 +108,8 @@ func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
 }
 
 func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
+	b.logger.Info("updating database")
+	
 	tx, err := b.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start database transaction: %w", err)
