@@ -108,8 +108,12 @@ func (b *Bot) CreateOrUpdateGuildsAndChannels() error {
 }
 
 func (b *Bot) CreateMessage(messages []*discordgo.MessageCreate) error {
-	b.logger.Info("updating database")
+	if len(messages) < 1 {
+		return nil
+	}
 	
+	b.logger.Info("updating database")
+
 	tx, err := b.db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to start database transaction: %w", err)
